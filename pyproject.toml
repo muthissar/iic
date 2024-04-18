@@ -15,20 +15,19 @@ authors = [
 readme = "README.md"
 license = {file = "LICENSE"}
 keywords = ["symbolic music", "musical surprise", "tokens", "inforomation theory"]
-
 dependencies = [
     "torch>=1.6",
     "einops==0.7.*"
 ]
+requires-python = ">= 3.8"
 
 [project.optional-dependencies]
 demo = [
   "matplotlib==3.4.*",
   "miditok==3.0.*",
   "ipympl==0.9.*",
-  # "ipython=="
+  "ipykernel>=6.29",
 ]
-
 
 [project.urls]
 Source = "https://github.com/muthissar/iic"
