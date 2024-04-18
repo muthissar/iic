@@ -9,6 +9,22 @@ from typing import Callable, Iterable, List, Optional
 
 @dataclass
 class ICCurve(Callable[[torch.FloatTensor], torch.FloatTensor]):
+    """
+    A class used to represent an Instantaneous Information Content Curve (IIC).
+
+    This class is a callable that takes a tensor of times and returns a tensor of corresponding IICs.
+
+    Methods
+    -------
+    __call__(t : torch.FloatTensor) -> torch.FloatTensor:
+        Abstract method for calculating intensities.
+        This method should be implemented by subclasses.
+
+    Parameters
+    ----------
+    t : torch.FloatTensor
+        A tensor of times for which to calculate intensities.
+    """
     def __call__(self, t : torch.FloatTensor) -> torch.FloatTensor:
         raise NotImplementedError
 
@@ -49,7 +65,6 @@ class Piecewise(DrawnICCurve):
     # NOTE alternatively scipy.interpolate.interp1d(x, y, kind='nearest'), but it's deprecated
     timepoints: List[float]
     ics: List[List[float]]
-    # time_relative: bool = False
     def __post_init__(self):
         super().__post_init__()
         assert len(self.timepoints) == len(self.ics) - 1
@@ -73,6 +88,32 @@ class Interpolator(ICCurve):
     weight_fn: Callable[[torch.FloatTensor], torch.FloatTensor]
     metric_clip:  Optional[torch.FloatTensor]= None
     reduce_equal_times: str = 'sum' # 'max', 'mean'
+    """
+    A class used to interpolate between different metrics over time.
+
+    This class inherits from the ICCurve class and implements the __call__ method
+    to calculate interpolated values based on a given weight function.
+
+    Attributes
+    ----------
+    metric_times : Iterable[torch.FloatTensor]
+        The times at which the metrics are measured.
+    metric: Iterable[torch.FloatTensor]
+        The metrics to be interpolated.
+    weight_fn: Callable[[torch.FloatTensor], torch.FloatTensor]
+        The weight function to be used for interpolation.
+    metric_clip: Optional[torch.FloatTensor]
+        The maximum value for the metrics (default is None).
+    reduce_equal_times: str
+        The method to be used for reducing metrics at the same time (default is 'sum').
+
+    Methods
+    -------
+    __post_init__():
+        Validates the input and pads the metric_times and metric sequences.
+    __call__(t : torch.FloatTensor) -> torch.FloatTensor:
+        Calculates interpolated values based on the weight function and the metrics.
+    """
     def __post_init__(self):
         lens = [len(ic) for ic in self.metric]
         assert all(l == len(ic) for l, ic in zip(lens, self.metric))
@@ -89,33 +130,39 @@ class Interpolator(ICCurve):
                     # max
                     if self.reduce_equal_times == 'max':
                         ics[time_mask] = max_val/c
-                    else:
                     # mean
+                    else:
                         ics[time_mask] /= c
         elif self.reduce_equal_times != 'sum':
             raise NotImplementedError
 
         self.metric_times = self.metric_times[..., None]
-        # self.metric = min(self.metric, self.metric_cap)
         if self.metric_clip is not  None:
-            # torch.as_tensor(self.metric_clip, dtype=torch.float32)
             self.metric = torch.where(self.metric > self.metric_clip, self.metric_clip, self.metric)
         assert self.metric_times.dim() == 4 and self.metric.dim() == 3 # bz, tokens, channels, (t=1?)
 
     def __call__(self, t : List[torch.FloatTensor]) -> List[torch.FloatTensor]:
-        #time_diffs = t[None, :, None] - self.ic_times[:, None]
-        # time_diffs = einops.rearrange(t, '(bz tok chan t) -> bz tok chan t', bz=1, chan=1, tok=1) - self.metric_times
+        """
+        Calculates interpolated values based on the weight function and the metrics.
+
+        Parameters
+        ----------
+        t : torch.FloatTensor
+            The times at which to calculate the interpolated values.
+
+        Returns
+        -------
+        torch.FloatTensor
+            The interpolated values at the input times.
+        """
         lens = [len(tt) for tt in t]
         t = torch.nn.utils.rnn.pad_sequence(t, batch_first=True, padding_value=-1)
         assert t.dim() == 2 # bz, t
         time_diffs = t[:, None, None] - self.metric_times
-        # rear = einops.rearrange(time_diffs, 'bz obs channels time_eval -> obs (bz channels time_eval)')
-        # hehe = rear.unique(dim=0, return_counts=True)
         w = self.weight_fn(time_diffs)
         w[time_diffs <.0] = 0.
         # NOTE: the ic padding cancels automatically.
 
         metric = self.metric.expand(w.shape[0], *self.metric.shape[1:])
         ret = einops.einsum(w, metric, 'bz tok chan t, bz tok chan -> bz t chan')
-        # return ret
         return [r[:l] for r, l in zip(ret, lens)]
