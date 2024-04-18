@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+
+[tool.setuptools.packages.find]
+where = ["src/"]
+include = ["ic.curves"]
+
+[project]
+name = "iic-curves"
+version = "0.1.0"
+description = "A description of your project"
+authors = [
+    {name = "Mathias Rose Bjare", email = "muthissar@gmail.com"},
+]
+readme = "README.md"
+license = {file = "LICENSE"}
+keywords = ["symbolic music", "musical surprise", "tokens", "inforomation theory"]
+
+dependencies = [
+    "torch>=1.6.*",
+    "einops>=0.7.*"
+]
+
+[project.optional-dependencies]
+demo = [
+  "matplotlib>=3.3.*",
+  "miditok==3.0.*",
+]
+
+
+[project.urls]
+Source = "https://github.com/muthissar/iic"
+Tracker = "https://github.com/muthissar/iic/issues"
