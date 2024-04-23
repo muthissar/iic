@@ -17,7 +17,7 @@ license = {file = "LICENSE"}
 keywords = ["symbolic music", "musical surprise", "tokens", "inforomation theory"]
 dependencies = [
     "torch>=1.6",
-    "einops==0.7.*"
+    "einops>=0.6"
 ]
 requires-python = ">= 3.8"
 
